@@ -1,0 +1,614 @@
+---
+title: "Analyzing MeRIP-seq data with TRESS"
+author: "Zhenxing Guo, zhenxing.guo@emory.edu"
+date: "23 August 2021"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Analyzing MeRIP-seq data with TRESS}
+  %\VignetteEngine{knitr::rmarkdown}
+  \usepackage[utf8]{inputenc}
+---
+
+    
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Abstract
+This vignette introduces the use of the package TRESS 
+(${\it T}$oobox for m${\it R}$NA ${\it E}$pigenetics 
+${\it S}$equencing analysi${\it S}$), 
+which is designed for analysis of MeRIP-seq data. It provides 
+functionalities for m6A methylation identification 
+and differential m6A methylation identification.
+TRESS utilizes Bayesian hierarchical negative 
+binomial models to extract signals in raw read counts, 
+and then conducts Wald tests to detect m6A methylation 
+and differential methylation.
+
+## Package
+ 0.99.0.
+
+## 1   Introduction
+### 1.1 Background
+The post-transcriptional epigenetic modiﬁcation on mRNA is an 
+emerging ﬁeld to study the gene regulatory mechanism and 
+their association with diseases. Recently developed 
+high-throughput sequencing technology named 
+Methylated RNA Immunoprecipitation Sequencing (MeRIP-seq) 
+enables one to proﬁle mRNA epigenetic modiﬁcation transcriptome-wide. 
+Two major tasks in the analysis of MeRIP-seq data are to 
+identify transcriptome-wide m6A methylation (namely "peak calling"), 
+and differential m6A methylation. 
+
+For the first problem, TRESS builds a two-step procedure to 
+identify transcriptome wide m6A regions. In the first step, 
+it quickly scans the whole transcriptome and losely identify 
+candidate regions using an ad hoc algorithm. In the second step, 
+it models read counts from candidate regions using an 
+empirical hierarchical negative binomial model to accounts 
+for all-sources variations. It also imposes a prior on 
+the dispersion of methylation, which induces a shrinkage 
+variance estimate by borrowing information from all 
+candidate regions. Wald test is constructed to detect 
+significant m6A regions from the candidates.
+For the second problem, TRESS constructs a general linear 
+framework based on hierarchical negative binomial model, 
+to connect methylation level of each region with factors 
+of interest. This characteristic makes TRESS applicable 
+not only for two-group comparisons, 
+but also in studies with complex design.
+
+
+
+### 1.2 Installation
+From GitHub: 
+```{r, eval = FALSE}
+install.packages("devtools") # if you have not installed "devtools" package
+library(devtools)
+install_github("https://github.com/ZhenxingGuo0015/TRESS")
+library(TRESS)
+```
+
+
+
+
+## 2   Quick start 
+### 2.1 Peak calling
+Here we provide quick examples of how TRESS performs peak 
+calling and differential peak calling.
+Prior to analysis, TRESS requires paired 
+input control and IP BAM files for each replicate of all samples: 
+input1.bam \& ip1.bam, input2.bam \& ip2.bam, .... 
+The BAM files contain mapped reads sequenced from 
+respective samples and are the output of sequence alignment tools 
+like Bowtie2. In addition to BAM files, 
+TRESS also needs the genome annotation of reads saved 
+in format of "*.sqlite". 
+
+Given both BAM files and annotation files, 
+peak calling in TRESS is conducted 
+using the following code:
+
+
+```{r, eval= FALSE}
+## Directly take BAM files in "datasetTRES" available on github
+library(TRESS)
+library(datasetTRES)
+Input.file = c("cb_input_rep1_chr19.bam", "cb_input_rep2_chr19.bam")
+IP.file = c("cb_ip_rep1_chr19.bam", "cb_ip_rep2_chr19.bam")
+BamDir = file.path(system.file(package = "datasetTRES"), "extdata/")
+annoDir = file.path(system.file(package = "datasetTRES"),
+                    "extdata/mm9_chr19_knownGene.sqlite")
+# OutDir = "/directory/to/output"  
+TRESS_peak(IP.file = IP.file,
+           Input.file = Input.file,
+           Path_To_AnnoSqlite = annoDir,
+           InputDir = BamDir,
+           #OutputDir = OutDir, specify a directory to save the output
+           experiment_name = "examplebyBam",
+           filetype = "bam")
+# peaks = read.table(paste0(OutDir, "/", "c"), 
+#                    sep = "\t", header = TRUE)
+  # read.table(file.path(system.file(package = "TRESS"),
+  #                            "extdata/examplebyBam_peaks.xls"),
+  #                  sep = "\t", header = TRUE)
+#head(peaks)
+```
+In this example, we use the dataset (only "chr19" from the 
+cerebellum sample of **Young Mouse data**) saved in 
+data package **datasetTRES** 
+(please install it first: 
+install_github("https://github.com/ZhenxingGuo0015/datasetTRES").
+
+To replace the example BAM files with your BAM files, the codes are:
+
+
+```{r, eval=FALSE}
+## or, take BAM files from your path
+Input.file = c("input_rep1.bam", "input_rep2.bam")
+IP.file = c("ip_rep1.bam", "ip_rep2.bam")
+BamDir = "/directory/to/BAMfile"
+annoDir = "/path/to/xxx.sqlite"
+OutDir = "/directory/to/output"
+TRESS_peak(IP.file = IP.file,
+           Input.file = Input.file,
+           Path_To_AnnoSqlite = annoDir,
+           InputDir = BamDir,
+           OutputDir = OutDir,
+           experiment_name = "example",
+           filetype = "bam")
+peaks = read.table(paste0(OutDir, "/", 
+                          "example_peaks.xls"), 
+                   sep = "\t", header = TRUE)
+head(peaks)
+```
+
+### 2.2 Differential peak calling
+If you have paired input ("input1.bam", "input2.bam",..., 
+"inputN.bam") and IP (ip1.bam", "ip2.bam", ..., "ipN.bam) 
+BAM files for samples from different conditions, 
+then differential peak calling in TRESS is performed with 
+the following codes:
+
+```{r, eval=FALSE, message= FALSE, warning= FALSE}
+InputDir = "/directory/to/BAMfile"
+Input.file = c("input1.bam", "input2.bam",..., "inputN.bam")
+IP.file = c("ip1.bam", "ip2.bam", ..., "ipN.bam")
+OutputDir = "/directory/to/output"
+Path_sqlit = "/path/to/xxx.sqlite"
+
+allBins = TRESS_DivideBins(IP.file = IP.file,
+                           Input.file = Input.file,
+                           Path_To_AnnoSqlite = Path_sqlit,
+                           InputDir = InputDir,
+                           OutputDir = OutputDir,
+                           experimentName = "example")
+Candidates = TRESS_DMRCandidates(Counts = allBins$binCount, 
+                                 bins = allBins$bins)
+Candidates = filterRegions(Candidates) ## filter or not
+
+### call DMRs
+design = "YourDesign"
+model = "YourModel"
+Contrast = "YourContrast"
+DMR.fit = TRESS_DMRfit(counts = Candidates$Counts,
+                       sf = Candidates$sf,
+                       variable = design,
+                       model = model)
+CoefName(DMR.fit)
+DMR.test = TRESS_DMRtest(DMR = DMR.fit, contrast = Contrast)
+```
+
+## 3  Using TRESS for m6A peak calling
+
+### 3.1 Input data preparation
+TRESS starts with paired input and IP BAM files from each replicate. 
+The input and IP BAM files are taken separately by 
+arguments "Input.file" and "IP.file" in the same order, 
+i.e., input1.bam, input2.bam, ... for "Input.file"; 
+ip1.bam, ip2.bam, .... for "IP.file." 
+For peak calling problem, these are paired input control 
+and IP replicates from one condition. 
+For differential peak calling problem, 
+they are paired input and IP replicates 
+for samples across all conditions. 
+
+In addition to BAM files, TRESS also needs a path to 
+an annotation file in order to obtain transcriptome wide bins, 
+bin-level read counts and annotation of each peak. 
+The annotation file is actually is a TXDB and is saved in 
+format of "*.sqlite", which is easily created using R function 
+"makeTxDbFromUCSC" from Bioconductor package "GenomicFeatures":
+```{r, eval=TRUE, message=FALSE, warning=FALSE}
+## Directly use "makeTxDbFromUCSC" function to create one
+library(GenomicFeatures)
+txdb = makeTxDbFromUCSC("mm9", "knownGene")
+#saveDb(txdb, file = paste0("YourPATH", "/", "YourGenome.sqlite")
+
+##  or load a TxDb annotation package like
+#library(TxDb.Mmusculus.UCSC.mm9.knownGene)
+#txdb <- TxDb.Mmusculus.UCSC.mm9.knownGene
+#saveDb(txdb, file = paste0("YourPATH", "/", "mm9_knownGene.sqlite")
+```
+
+Methods used for peak calling in TRESS are 
+distinguished by the number of replicates. 
+If there are multiple replicates, 
+TRESS first obtains candidate regions with an 
+ad hoc algorithm and then detects and 
+identifies significant m6A regions from the candidates. 
+If there is only one replicate, candidate regions from 
+the first step are the final peak list.
+
+### 3.2 Multiple replicates 
+#### 3.2.1 Bin-level read counts and bump finding
+Given the TXDB file, TRESS first divide each gene 
+into 50bp long bins and calculate the bin-level read counts. 
+Then, binomial test is conducted for each bin to obtain 
+their statistical significance. An ad hoc bump-finding algorithm 
+is applied to combine significant bins 
+(and/or bins with large fold change) to form bumps in each replicate. 
+Bumps from all replicates are combined together to 
+construct a list of candidate regions. 
+Both binomial tests and bump-finding are done by 
+function "M6Apeak.MultiRep.step1()" in TRESS. 
+Here is an example of how to run "M6Apeak.MultiRep.step1()", 
+given bin-level read counts from 7 mouse basal cortex replicates.
+
+```{r,eval=TRUE, message=FALSE, warning=FALSE}
+library(TRESS)
+## load in built-in bin-level read counts 
+data("Basal_binlevel") 
+### The first 14 columns are from basal samples of mouse cortex
+sf0 = colSums(Basal_binlevel$bincounts
+              )/median(colSums(Basal_binlevel$bincounts))
+### first step to call candidate regions
+Candidates = M6Apeak.MultiRep.step1(
+  Counts = Basal_binlevel$bincounts[
+    ,grepl("basal",colnames(Basal_binlevel$bincounts))],
+  bins = Basal_binlevel$bins,
+  sf = sf0[grepl("basal",names(sf0))],
+  WhichThreshold = "lfc",
+  lfc.cutoff = 0.5)
+```
+
+#### 3.2.2 Detect and rank significant m6A regions from candidates
+After obtaining candidate regions, TRESS models read counts 
+in candidate regions using a hierarchical negative-binomial model. 
+Wald tests are then conducted to detects significant regions 
+from candidates, where a region with methylation level significantly 
+higher than the background is considered as sigificant. 
+The background level is estimated based on total read counts 
+from non-candidate regions, which is calculated as follows:
+
+```{r, eval=TRUE}
+### estimate background methylation level
+idx = which(grepl("rep", colnames(Candidates)) | 
+              grepl("bam", colnames(Candidates)))
+PeakCount = Candidates[, idx]
+bgCount = colSums(Basal_binlevel$bincounts[
+  , grepl("basal",
+          colnames(Basal_binlevel$bincounts))]) - 
+  colSums(PeakCount)
+
+bg.Input = bgCount[seq(1, length(bgCount), 2)]
+bg.IP = bgCount[seq(2, length(bgCount), 2)]
+bg.mu = mean((bg.IP/sf0[seq(2, length(bgCount), 2)]
+              )/(
+                bg.IP/sf0[seq(2, length(bgCount), 2)] + 
+                  bg.Input/sf0[seq(1, length(bgCount),   
+                                   2)]), na.rm = TRUE)
+```
+
+Complete parameter estimation and statistical inference 
+for candidate regions are achieved by function 
+"M6Apeak.MultiRep.step2()" in TRESS.
+```{r, eval = TRUE, message=FALSE, warning=FALSE}
+Peaks = M6Apeak.MultiRep.step2(
+  Candidates = Candidates, 
+  mu.cutoff = bg.mu,
+  sf =sf0[grepl("basal",names(sf0))])
+
+head(Peaks)
+```
+
+Given the usage of function "M6Apeak.MultiRep.step2()", 
+it can also be adopted to re-rank existing peaks with our 
+developed methods. This may perform bad if you didn't properly 
+estimate library size factors for each sample. 
+Based on our experience, the estimation of size factor 
+should be based on the bin-level counts across the 
+whole transcriptome, not the  region-level counts. 
+For background methylation level, 
+you can use 0.5 but it would be informative if you can estimate it 
+from your data. The following chunk of codes shows an example 
+for re-ranking existing peaks with 
+function "M6Apeak.MultiRep.step2()".
+
+```{r, eval=FALSE, message= TRUE, warning= FALSE}
+library(TRESS)
+data("Basal_regionlevel") ### load candidate regions
+data("Basal_binlevel") ### load sf0 estimated from bin-level count
+head(Basal_regionlevel)
+peaks = M6Apeak.MultiRep.step2(
+  Candidates = Basal_regionlevel,
+  sf = Basal_binlevel$sf, 
+  mu.cutoff = 0.5,
+  WhichThreshold = "fdr")
+head(peaks)
+```
+
+### 3.3 Only one replicate
+The above two-step approach is for data with multiple replicates. 
+For data with only one replicate, TRESS uses function "M6Apeak.oneRep()" 
+for peak calling. In this case, bumps from the first step in 
+above two-step procedure are taken as final list of peaks. 
+The statistical significance of each peak comes from binomial tests. 
+Here we show an example of how to use function "M6Apeak.oneRep()".
+
+```{r, eval = TRUE, message= FALSE, warning= FALSE}
+# A toy example
+library(TRESS)
+data("Basal_binlevel")
+bincounts = Basal_binlevel$bincounts[, 1:2]
+sf0 = Basal_binlevel$sf[1:2]
+bins = Basal_binlevel$bins
+peaks = M6Apeak.oneRep(Counts = bincounts, 
+                       sf = sf0, bins = bins)
+head(peaks)
+```
+
+
+
+### 3.4 Visualization of individual peaks
+With pre-called peaks in hand, one can visualize them 
+using function "ShowOnePeak()" in TRESS. 
+The usage of this function is
+```{r, eval=FALSE, message= FALSE, warning= FALSE}
+ShowOnePeak(onePeak, allBins, binCounts, ext = 500, ylim = c(0,1))
+```
+In order to run this function, you need to have: 
+1) "onePeak": 
+a pre-called peak saved as a dataframe, 
+which contains genomic positions for that peak: 
+"chr", "start", "end", "strand"; 
+2) "allBins": genomic positions ("chr", "start", "end", "strand") 
+of all bins you used to call peaks; 
+3) "binCounts": the corresponding bin-level 
+read counts in each replicate.
+This function will plot for each replicate: 
+the methylation level of bins (blue bars) within 
+the target peak(shade region in pink), 
+and the normalized sequencing depth for input samples (curves in grey).
+We show some example plots here:
+
+```{r, eval=FALSE, message= FALSE, warning= FALSE}
+peaks = read.table(file.path(system.file(package = "TRESS"),
+                             "extdata/examplebyBam_peaks.xls"),
+                   sep = "\t", header = TRUE) 
+load(file.path(system.file(package = "TRESS"),
+               "extdata/examplebyBam.rda"))
+allBins = as.data.frame(bins$bins)
+colnames(allBins)[1] = "chr"
+allBins$strand = binStrand
+
+head(peaks)
+# #for (i in 1:4) {
+ #png(file = paste0("ExamplePeaks.png"), bg = "transparent")
+   ShowOnePeak(onePeak = peaks[1,], allBins = allBins, 
+               binCounts = allCounts)
+ #dev.off()
+# #}
+```
+
+```{r echo=FALSE, out.height = "80%", out.width = "80%", include=TRUE}
+knitr::include_graphics("ExamplePeaks.png")
+```
+
+
+## 4   Using TRESS for differential peak calling 
+Similar to peak calling, TRESS conducts differential peak calling 
+using a two-step procedure. It first identifies candidate DMRs 
+from samples across all groups and then detects significant DMRs 
+among all candidates. The input data requires paired IP and input
+BAM files for each replicate of samples across all conditions, 
+and genome annotation file saved in format of "*.sqlite". 
+
+
+### 4.1  Obtain candidate DMRs
+TRESS uses the same algorithm applied in peak calling to obtain 
+candidate DMRs, where candidate DMRs are 
+the union of candidate regions from group-specific samples. 
+Given paired input and IP BAM files, 
+candidate DMRs from all samples are obtained 
+using the following codes.
+
+```{r, eval=FALSE}
+InputDir = "/directory/to/BAMfile"
+Input.file = c("input1.bam", "input2.bam",..., "inputN.bam")
+IP.file = c("ip1.bam", "ip2.bam", ..., "ipN.bam")
+OutputDir = "/directory/to/output"
+Path_sqlit = "/path/to/xxx.sqlite"
+
+allBins = TRESS_DivideBins(IP.file = IP.file,
+                           Input.file = Input.file,
+                           Path_To_AnnoSqlite = Path_sqlit,
+                           InputDir = InputDir,
+                           OutputDir = OutputDir,
+                           experimentName = "example")
+Candidates = TRESS_DMRCandidates(Counts = allBins$binCount, 
+                                 bins = allBins$bins)
+Candidates = filterRegions(Candidates) ## filter or not
+
+```
+TRESS uses function "TRESS_DivideBins()" to first divide the 
+whole transcriptome into bins of fixed length and 
+then obtains bin-level read counts and genomic coordinates. 
+Then, it call function "TRESS_DMRCandidates()" to loosely 
+identify candidate 
+DMRs from samples across all conditions.
+
+After that it filters out candidate DMRs who have small 
+marginal coefficient of variation in methylation ratio (
+$\frac{\text{normalized } IP}{ \text{normalized } IP 
+\text{ + }\text{normalized } input}$) to further 
+reduce the hypothesis tesing space.
+
+
+### 4.2 DMR detection from candidate DMRs
+With candidate DMRs, TRESS fits hierarchical negative binomial 
+models for read counts them, where methylation 
+level of each candidate DMR is connected 
+to factors of interest using a linear frame work. 
+The model fitting consists 
+of: (1) estimate coefficients in design matrix 
+for each candidate DMR; 
+(2) estimate dispersion of methylation for each candidate DMR; 
+
+After model fitting, TRESS conducts Wald test for each candidate DMR.
+As mentioned earlier, the methylation level of each candidate
+is linked to factors in a linear frame work. 
+This characteristic allows for
+testing all coefficients in the design and 
+any linear combination of them through a particular contrast. 
+Therefore, TRESS can be applied in studies 
+only considering a two-group comparison and 
+studies with a more complex design.
+
+
+#### 4.2.1 Two-group comparison
+Here, we use a human data as an example, which consists of 
+candidate DMR read counts from
+samples of two conditions: Wild type and METTL3-Knockout. 
+There are two replicates of paired IP and input data for 
+samples from each condition. To estimate parameters 
+for each candidate DMR, do:
+
+```{r, eval= TRUE}
+library(TRESS)
+data("DMR_M3vsWT") # data from TRESS
+head(DMR_M3vsWT$Counts)
+design = data.frame(predictor = rep(c("WT", "M3"), c(2, 2)))
+model = ~1+predictor
+DMR.fit = TRESS_DMRfit(counts = DMR_M3vsWT$Counts,
+                       sf = DMR_M3vsWT$sf,
+                       variable = design,
+                       model = model)
+```
+Note, the sample order in above ``design$predictor``
+must be exactly the same as that in data matrix ``DMR_M3vsWT$Counts``.
+
+To compare methylation levels between Wild type 
+and METTL3-Knockout samples, do:
+
+```{r,eval= TRUE}
+CoefName(DMR.fit) ## show variable name of each coefficient
+DMR.test = TRESS_DMRtest(DMR = DMR.fit, contrast = c(0, 1))
+head(DMR.test[which(DMR.test$padj < 0.05)[1:5], ])
+head(DMR_M3vsWT$Regions[which(DMR.test$padj < 0.05)[1:5], ])
+```
+The option ``contrast = c(0, 1)`` is equivalent to test 
+coefficient $\beta^{predictorWT} = 0$.
+
+Individual DMR can be visulized using function ``ShowOnePeak()``:
+```{r, eval=FALSE}
+ii = order(abs(DMR.test$stat), decreasing = TRUE)
+snames = paste0(rep(c("WT_", "M3_"), each = 2), 
+                rep(c("Replicate1", "Replicate2"), 2))
+png(file = "./vignettes/ExampleDMR.png", width = 480, height = 480)
+ShowOnePeak(onePeak = DMR_M3vsWT$Regions[ii[9], ],
+            allBins = DMR_M3vsWT$Bins,
+            binCounts = DMR_M3vsWT$BinsCounts,
+            isDMR = TRUE,
+            Sname = snames)
+dev.off()
+```
+
+```{r echo=FALSE, out.height = "80%", out.width = "80%", include=TRUE}
+knitr::include_graphics("ExampleDMR.png")
+```
+#### 4.3 General experiment design
+For data from experiments with a general design, 
+they are modeled through a multiple regression framework, 
+and thus hypothesis testing can be performed for one, multiple, 
+or any linear combination of the parameters.
+
+Here, we use an example mouse brain data as an example to illustrate 
+how TRESS detects DMRs in a multifactor design. This data contains 
+candidate read counts from two mouse brain regions 
+(cortex and hypothalamus) at two time points (2-week-old and 6-week-old). 
+Each sample contains two replicates of paired input and IP data. 
+
+
+To fit our model on this data without considering the interaction 
+between time and region, do,
+```{r, eval = TRUE}
+library(TRESS)
+data("DMR_SixWeekvsTwoWeek")
+design = data.frame(time = rep(c("2wk", "6wk"), each = 4),
+                    region = rep(rep(c("Cortex", "Hypothalamus"), 
+                                       each = 2),2)
+                    )
+model = ~1 + time + region 
+DMRfit = TRESS_DMRfit(counts = DMR_SixWeekvsTwoWeek$Counts, 
+                      sf = DMR_SixWeekvsTwoWeek$sf, 
+                      variable = design,
+                      model = model)
+```
+Again, the sample order in ``design$time`` and in ``design$region``
+must be exactly the same as that in data matrix ``DMR_SixWeekvsTwoWeek$Counts``.
+
+To test the whole time effect, do:
+```{r, eval = TRUE}
+CoefName(DMRfit)
+DMRtest = TRESS_DMRtest(DMRfit, contrast = c(0, 1, 0))
+idx = order(abs(DMRtest$stat), decreasing = TRUE)
+DMRtest[idx[1:5], ]
+DMR_SixWeekvsTwoWeek$MeRatio[idx[1:5],]
+```
+Here, the reason we specify ``contrast = c(0, 1, 0)`` is that 
+the second column of design 
+matrix ``model.matrix( model, design)`` corresponds to time 
+This contrast is equivalent to test the 
+coefficient of time equal to 0, i.e., $\beta^{\text{time6wk}} = 0$.
+
+
+If we consider the interaction between time and region and want to
+test region-specific time effect, just include ``time*region`` 
+into design matrix and do,
+```{r, eval = TRUE}
+model.int = ~1+ time + region + time*region 
+model.matrix( model.int, design)
+DMRfit.int = TRESS_DMRfit(counts = DMR_SixWeekvsTwoWeek$Counts, 
+                          sf = DMR_SixWeekvsTwoWeek$sf, 
+                          variable = design,
+                          model = model.int)
+```
+
+Then, in cortex, DMRs by time effect can be obtained through:
+```{r, eval = TRUE}
+CoefName(DMRfit.int)
+CTX.6vs2 = TRESS_DMRtest(DMRfit.int, contrast = c(0, 1, 0, 0))
+idx = order(abs(CTX.6vs2$stat), decreasing = TRUE)
+CTX.6vs2[idx[1:5], ]
+DMR_SixWeekvsTwoWeek$MeRatio[
+  idx[1:5], 
+  grepl("Cortex",colnames(DMR_SixWeekvsTwoWeek$MeRatio))]
+```
+
+
+In hypothalamus, DMRs by time effect can be obtained through:
+```{r, eval = TRUE}
+HTH.6vs2 = TRESS_DMRtest(DMRfit.int, contrast = c(0, 1, 0, 1))
+idx = order(abs(HTH.6vs2$stat), decreasing = TRUE)
+HTH.6vs2[idx[1:5], ]
+DMR_SixWeekvsTwoWeek$MeRatio[
+  idx[1:5], 
+  grepl("Hypothalamus",colnames(DMR_SixWeekvsTwoWeek$MeRatio))]
+```
+
+Detection of DMRs by interaction of time and region (meaning that 
+the temporal difference in methylation of these DMRs changes spatially) 
+can be done through:
+```{r, eval = FALSE}
+CTXvsHTH.6vs2 = TRESS_DMRtest(DMRfit.int, contrast = c(0, 0, 0, 1))
+idx = order(abs(CTXvsHTH.6vs2$stat), decreasing = TRUE)
+CTXvsHTH.6vs2[idx[1:5], ]
+DMR_SixWeekvsTwoWeek$MeRatio[
+  idx[1:5], c(1,2,5,6,3,4,7,8)]
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
