@@ -13,7 +13,7 @@ Our package TRESS provides functions for peak calling and differential peak call
 based on empirical Bayesian hierarchical models. 
 The method accounts for various sources of variations in the data through rigorous modeling, 
 and achieves shrinkage estimation by 
-borrowing informations from transcriptome-wide data to stabilize the parameter estimation.
+borrowing information from transcriptome-wide data to stabilize the parameter estimation.
 
 Here, we briefly describe how to install TRESS package through GitHub. For detailed usage of TRESS, 
 please refer to the vignette file.
@@ -36,61 +36,59 @@ library(TRESS)
 browseVignettes("TRESS")
 ```
 
-
-##   Quick start 
-###  Peak calling
+## Quick start on peak calling
 Here we provide quick examples of how TRESS performs peak 
 calling and differential peak calling.
 Prior to analysis, TRESS requires paired 
 input control and IP BAM files for each replicate of all samples: 
-input1.bam \& ip1.bam, input2.bam \& ip2.bam, .... 
+"input1.bam \& ip1.bam", "input2.bam \& ip2.bam", .... 
 The BAM files contain mapped reads sequenced from 
 respective samples and are the output of sequence alignment tools 
-like Bowtie2. In addition to BAM files, 
+like ``Bowtie2``. In addition to BAM files, 
 TRESS also needs the genome annotation of reads saved 
-in format of "*.sqlite". 
+in format of ``*.sqlite``.
 
-Given both BAM files and annotation files, 
+For illustration purpose, we include four example BAM files 
+and one corresponding genome annotation file in 
+our publicly available data package ``datasetTRES``on github, 
+which can be installed with
+```{r, eval= FALSE}
+install_github("https://github.com/ZhenxingGuo0015/datasetTRES")
+```
+The BAM files contain sequencing reads (only on chromosome 19) 
+from two input \& IP mouse brain cerebellum samples.
+Given both BAM and annotation files, 
 peak calling in TRESS is conducted 
-using the following code:
+by:
 
-
-
-```r
+```{r, eval= FALSE}
 ## Directly take BAM files in "datasetTRES" available on github
 library(TRESS)
-library(datasetTRES) 
+library(datasetTRES)
 Input.file = c("cb_input_rep1_chr19.bam", "cb_input_rep2_chr19.bam")
 IP.file = c("cb_ip_rep1_chr19.bam", "cb_ip_rep2_chr19.bam")
 BamDir = file.path(system.file(package = "datasetTRES"), "extdata/")
 annoDir = file.path(system.file(package = "datasetTRES"),
                     "extdata/mm9_chr19_knownGene.sqlite")
-# OutDir = "/directory/to/output"  
+OutDir = "/directory/to/output"  
 TRESS_peak(IP.file = IP.file,
            Input.file = Input.file,
            Path_To_AnnoSqlite = annoDir,
            InputDir = BamDir,
-           #OutputDir = OutDir, specify a directory to save the output
-           experiment_name = "examplebyBam",
+           OutputDir = OutDir, # specify a directory for output
+           experiment_name = "examplebyBam", # name your output 
            filetype = "bam")
-# peaks = read.table(paste0(OutDir, "/", "c"), 
-#                    sep = "\t", header = TRUE)
-  # read.table(file.path(system.file(package = "TRESS"),
-  #                            "extdata/examplebyBam_peaks.xls"),
-  #                  sep = "\t", header = TRUE)
-#head(peaks)
 ```
-In this example, we use the dataset (only "chr19" from the 
-cerebellum sample of **Young Mouse data**) saved in 
-data package **datasetTRES** 
-(please install it first: 
-install_github("https://github.com/ZhenxingGuo0015/datasetTRES").
+```{r, eval= TRUE}
+### example peaks
+peaks = read.table(file.path(system.file(package = "TRESS"),
+                           "extdata/examplebyBam_peaks.xls"),
+                 sep = "\t", header = TRUE)
+head(peaks[, -c(5, 14, 15)], 3)
+```
 
 To replace the example BAM files with your BAM files, the codes are:
-
-
-
-```r
+```{r, eval=FALSE}
 ## or, take BAM files from your path
 Input.file = c("input_rep1.bam", "input_rep2.bam")
 IP.file = c("ip_rep1.bam", "ip_rep2.bam")
@@ -107,45 +105,56 @@ TRESS_peak(IP.file = IP.file,
 peaks = read.table(paste0(OutDir, "/", 
                           "example_peaks.xls"), 
                    sep = "\t", header = TRUE)
-head(peaks)
+head(peaks, 3)
 ```
 
-###  Differential peak calling
-If you have paired input ("input1.bam", "input2.bam",..., 
-"inputN.bam") and IP (ip1.bam", "ip2.bam", ..., "ipN.bam) 
-BAM files for samples from different conditions, 
-then differential peak calling in TRESS is performed with 
-the following codes:
+## Quick start on differential peak calling
+If one has paired input and IP ("input1.bam \& ip1.bam", 
+"input2.bam \& ip2.bam", ..., "inputN.bam \& ipN.bam")
+BAM files listed in order for samples from 
+different conditions, then one can apply TRESS to call
+differential m6A methylation regions (DMRs). 
+For DMRs calling, in addition to BAM and 
+genome annotation files, TRESS also needs a
+``variable`` data frame and a particular 
+``model`` to construct a design matrix 
+(``model.matrix(model, variable)``) for model fitting,
+and a ``Contrast`` for hypothesis testing.
 
-
-```r
+With all required information prepared, do,
+```{r, eval=FALSE, message= FALSE, warning= FALSE}
 InputDir = "/directory/to/BAMfile"
 Input.file = c("input1.bam", "input2.bam",..., "inputN.bam")
 IP.file = c("ip1.bam", "ip2.bam", ..., "ipN.bam")
 OutputDir = "/directory/to/output"
 Path_sqlit = "/path/to/xxx.sqlite"
-
-allBins = TRESS_DivideBins(IP.file = IP.file,
-                           Input.file = Input.file,
-                           Path_To_AnnoSqlite = Path_sqlit,
-                           InputDir = InputDir,
-                           OutputDir = OutputDir,
-                           experimentName = "example")
-Candidates = TRESS_DMRCandidates(Counts = allBins$binCount, 
-                                 bins = allBins$bins)
-Candidates = filterRegions(Candidates) ## filter or not
-
-### call DMRs
-design = "YourDesign"
-model = "YourModel"
-Contrast = "YourContrast"
-DMR.fit = TRESS_DMRfit(counts = Candidates$Counts,
-                       sf = Candidates$sf,
-                       variable = design,
-                       model = model)
-CoefName(DMR.fit)
+variable = "YourVariable" # a dataframe containing both
+# testing factor and potential covariates, e.g., 
+# variable = data.frame(Trt = rep(c("Ctrl", "Trt"), each = N/2))
+model = "YourModel"     # e.g. model = ~1 + Trt
+DMR.fit = TRESS_DMRfit(IP.file = IP.file,
+                       Input.file = Input.file,
+                       Path_To_AnnoSqlite = Path_sqlit,
+                       variable = variable,
+                       model = model,
+                       InputDir = InputDir,
+                       OutputDir = OutputDir,
+                       experimentName = "example"
+                       )
+CoefName(DMR.fit)# show the name of and order of coefficients 
+                 # in the design matrix
+Contrast = "YourContrast" # e.g., Contrast = c(0, 1)
 DMR.test = TRESS_DMRtest(DMR = DMR.fit, contrast = Contrast)
 ```
+As shown above, TRESS separates the model fitting 
+(implemented by function ``TRESS_DMRfit()``), which is the most 
+computationally heavy part, from the hypothesis testing 
+(implemented by function ``TRESS_DMRtest()``). 
+Given an experimental design with multiple factors, 
+the parameter estimation (model fitting) only 
+needs to be performed once, 
+and then the hypothesis testing for 
+DMR calling can be performed for different factors efficiently. 
 
 For detailed usage of the package, please refer to the vignette file through
 

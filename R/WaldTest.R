@@ -13,17 +13,10 @@ WaldTest <- function(Coef, Cov, Contrast, nullModel ="standN"){
   lor = t(Contrast)%*%t(Coef)
   stat = (t(Contrast)%*%t(Coef))/se
   tmp.infer = DMRInfer(stat, nullModel = nullModel)
-  if(nullModel == "locfdr") {
-    return(res = data.frame(logOR = as.numeric(lor),
-                            lorSE = as.numeric(se),
-                            stat = round(as.numeric(stat),3),
-                            fdr = as.numeric(tmp.infer$fdr)))
-    }else{
-      return(res = data.frame(logOR = as.numeric(lor),
-                              lorSE = as.numeric(se),
-                              stat = round(as.numeric(stat), 3),
-                              pvalue = as.numeric(tmp.infer$pvalue),
-                              padj = as.numeric(tmp.infer$padj)))
-      }
+  return(res = data.frame(logOR = as.numeric(lor),
+                          lorSE = as.numeric(se),
+                          stat = round(as.numeric(stat), 3),
+                          pvalue = as.numeric(tmp.infer$pvalue),
+                          padj = as.numeric(tmp.infer$padj)))
 }
 

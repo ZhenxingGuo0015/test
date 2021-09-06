@@ -8,7 +8,8 @@ EstiPhi.JointUpdate <- function(y, x,
                                 optM,
                                 myfscale,
                                 eps = 1e-05){
-  ### function to get estimate of phi and theta with optim function
+  ### function to get estimate of phi and theta
+  ### with optim function
   ### log likelihood
   log.lik <- function(para, yy, xx, mmu, sx, sy,
                       mlphi, sdlphi){

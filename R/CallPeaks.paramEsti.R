@@ -1,11 +1,11 @@
 # Parameter estimation and inference in step2 of peak calling
-M6Apeak.paramEsti <- function(mat,
-                              sf = NULL,
-                              cutoff = NULL,
-                              update = "Joint",
-                              trans = NULL,
-                              optM = "L-BFGS-B",
-                              myfscale = -1e+6){
+CallPeaks.paramEsti <- function(mat,
+                                sf = NULL,
+                                cutoff = NULL,
+                                update = "Joint",
+                                trans = NULL,
+                                optM = "L-BFGS-B",
+                                myfscale = -1e+6){
   ### get statistic for each peak
   mu.hat <- EstiMu(counts = mat, sf = sf)
   para <- EstiPhi(counts = mat, sf = sf,
@@ -21,13 +21,13 @@ M6Apeak.paramEsti <- function(mat,
   rankScore <- (mu.hat - mean(mu.hat,
                               na.rm = TRUE))/sqrt(mu.var)
   ###
-  return(data.frame(mu = mu.hat,
-                    mu.var = mu.var,
-                    stats = Infer$stat,
-                    shrkPhi = para$phi,
-                    shrkTheta = para$theta,
+  return(data.frame(mu = round(mu.hat, 3),
+                    mu.var = round(mu.var, 5),
+                    stats = round(Infer$stat, 3),
+                    shrkPhi = round(para$phi, 6),
+                    shrkTheta = round(para$theta, 3),
                     pvals = Infer$pval,
                     p.adj = Infer$fdr,
-                    rScore = rankScore)
+                    rScore = round(rankScore, 3))
          )
   }

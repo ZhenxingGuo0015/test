@@ -1,19 +1,4 @@
 ############### Functions related to Newton-Raphson based on NB
-# log.lik_NB <- function(x, y, sx, sy, D, R, s, t){
-#   ### log likelihood for a single region
-#   ###### To make sure phi ~ (0,1), theta >0, we reparameterize
-#   ###### phi = exp(s)/(1+exp(s)), theta = exp(t)
-#   mu = exp(D%*%R)/(1 + exp(D%*%R))
-#   mu[mu == 1] = 0.9
-#   mu[mu == 0] = 0.01
-#   phi = max(min(exp(s)/(1+exp(s)), 0.99), exp(-20)/(1+exp(-20)))
-#   theta = max(min(exp(t), 1000), 0.0001)
-#   sum(dnbinom(x, size = (1-mu)*(phi^{-1} -1),
-#               prob = 1/(1+theta*sx), log = TRUE) +
-#         dnbinom(y, size = mu*(phi^{-1} -1),
-#                 prob = 1/(1+theta*sy), log = TRUE))
-# }
-
 log.lik_NB <- function(x, y, sx, sy, D, R, s, t){
   ### log likelihood for a single region
   ###### To make sure phi ~ (0,1), theta >0, we reparameterize

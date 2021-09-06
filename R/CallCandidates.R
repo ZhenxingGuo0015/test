@@ -1,10 +1,10 @@
-TRESS_DMRCandidates <- function(Counts, bins,
-                             WhichThreshold ="fdr_lfc",
-                             pval.cutoff = 1e-5,
-                             fdr.cutoff = 0.05,
-                             lfc.cutoff = 0.7,
-                             windlen = 5,
-                             lowcount = 30){
+CallCandidates <- function(Counts, bins,
+                           WhichThreshold ="fdr_lfc",
+                           pval.cutoff = 1e-5,
+                           fdr.cutoff = 0.05,
+                           lfc.cutoff = 0.7,
+                           windlen = 5,
+                           lowcount = 30){
   ### 1. find bumps for each replicate based on binomial test
   sf = colSums(Counts)/median(colSums(Counts))
   sx = sf[seq(1, length(sf), 2)]; sy = sf[seq(2, length(sf), 2)]
@@ -15,7 +15,7 @@ TRESS_DMRCandidates <- function(Counts, bins,
   Pvals = matrix(0, nrow = nrow(Counts), ncol = length(blocks))
   Bumps = vector("list", length = length(blocks))
   for (j in seq_along(blocks)) {
-    cat(j, sep = "\n")
+    #cat(j, sep = "\n")
     id = blocks[j]
     dat = Counts[, id:(id+1)]
     thissf = sf[id:(id+1)]
@@ -52,7 +52,7 @@ TRESS_DMRCandidates <- function(Counts, bins,
   thispeak = NULL
   #  for (i in 1:(length(Bumps))) {
   for (i in seq_len(length(Bumps))) {
-    cat(paste0("Bumps ", i), sep = "\n")
+   # cat(paste0("Bumps ", i), sep = "\n")
     thisBump = Bumps[[i]]
     thisBump$strand[thisBump$strand=="."] ="*"
     thisBump.GR = GRanges(Rle(thisBump$chr),
@@ -103,20 +103,41 @@ TRESS_DMRCandidates <- function(Counts, bins,
     thiscount = getPeakCounts(peaks = thispeak,
                               allCounts = Counts,
                               allBins = bins.GR)
+    ### add lfc, only used for peak calling
+    if(nrow(thispeak) > 1){
+      myMeans = rowMeans
+    }else{
+      myMeans = mean
+    }
+    idx.x = seq(1, ncol(thiscount), 2)
+    idx.y = seq(2, ncol(thiscount), 2)
+    lfc = log(myMeans((thiscount[, idx.y]/sf[idx.y] + c0
+    )/(thiscount[, idx.x]/sf[idx.x] + c0),
+    na.rm = TRUE))
+    if(length(lfc) > windlen){
+      smooth.lfc <- mySmooth(lfc, windlen = windlen)
+    }else{
+      smooth.lfc = lfc
+    }
+    #####
 
     ##########
-    Candidates = list(Regions = thispeak, Counts = thiscount, sf = sf)
+    Candidates = list(Regions = thispeak, Counts = thiscount,
+                      lg.fc = smooth.lfc,
+                      sf = sf)
     if(nrow(thiscount) >= 2){
       idx = which(rowSums(thiscount[, seq(1, ncol(thiscount), 2)])
                   > lowcount &
                     rowSums(thiscount[, seq(2, ncol(thiscount), 2)])
                   > lowcount)
-      tmp1 = thispeak[idx, ];tmp2 = thiscount[idx, ]
+      tmp1 = thispeak[idx, ];tmp2 = thiscount[idx, ]; tmp3 = smooth.lfc[idx]
       rownames(tmp1) = rownames(tmp2) = as.factor(seq_len(nrow(tmp1)))
-      Candidates = list(Regions = tmp1, Counts = tmp2, sf = sf)
+      names(tmp3) = as.factor(seq_len(nrow(tmp1)))
+      Candidates = list(Regions = tmp1, Counts = tmp2,
+                        lg.fc = tmp3, sf = sf)
     }
-    cat("The number of Candidates from all samples are: ",
-        nrow(Candidates$Regions), sep = "\n")
+    # cat("The number of Candidates from all samples are: ",
+    #     nrow(Candidates$Regions), sep = "\n")
   }else{
     Candidates = list()
     cat("No candidates from any samples!", sep = "\n")

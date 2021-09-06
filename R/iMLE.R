@@ -1,13 +1,16 @@
-iMLE <- function(i, X, Y, sx, sy, Ratio, D, iniby = "lm",
+iMLE <- function(i, X, Y, sx, sy, Ratio, D,
+                #iniby = "lm",
                  max.iter = 10,  eps = 1e-5){
   #### conduct MLE estimate based on NB model for a single site.
-  Y.norm = round(sweep(Y, 2, sy, FUN = "/"))
-  X.norm = round(sweep(X, 2, sx, FUN = "/"))
-  Total = X.norm + Y.norm
-  R.ini = InitialCoef(x.norm = X.norm[i, ],
-                      y.norm = Y.norm[i, ],
-                      ratio = Ratio[i, ],
-                      D, iniby = iniby)
+  #Y.norm = round(sweep(Y, 2, sy, FUN = "/"))
+  #X.norm = round(sweep(X, 2, sx, FUN = "/"))
+  #Total = X.norm + Y.norm
+  # R.ini = InitialCoef(x.norm = X.norm[i, ],
+  #                     y.norm = Y.norm[i, ],
+  #                     ratio = Ratio[i, ],
+  #                     D, iniby = iniby)
+  #
+  R.ini = solve(t(D)%*%D)%*%t(D)%*%mylogit(Ratio[i, ])
   mu0 = exp(D%*%R.ini)/(1+exp(D%*%R.ini))
   if(!all(mu0 <= 0.51)){
     tmp = JProfileMLE.phitheta(x = X[i, ], y = Y[i, ],
@@ -37,13 +40,6 @@ iMLE <- function(i, X, Y, sx, sy, Ratio, D, iniby = "lm",
     }
     phi.NB = phi.tmp; theta.NB = theta.tmp
     ############################### update R
-    ### modified on August 08, 2021
-    # R.NB = profileMLE.coef(x = X[i, ], y = Y[i, ],
-    #                        sx = sx, sy = sy, D = D,
-    #                        R.ini = R.ini,
-    #                        phi0 = phi.NB, theta0 = theta.NB,
-    #                        max.iter = max.iter)
-
     res = profileMLE.coef(x = X[i, ], y = Y[i, ],
                           sx = sx, sy = sy, D = D,
                           R.ini = R.ini,

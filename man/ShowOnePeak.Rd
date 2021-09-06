@@ -11,8 +11,8 @@ and the corresponding normalized input read depth (grey curve).
 }
 \usage{
 ShowOnePeak(onePeak, allBins, binCounts,
-isDMR = FALSE,Sname = NULL,
-ext = 500, ylim = c(0, 1))
+            isDMR = FALSE,Sname = NULL,
+            ext = 500, ylim = c(0, 1))
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -21,7 +21,7 @@ A one-row dataframe containing the genomic
 position of a single peak: chr, start, end, strand.
 }
   \item{allBins}{
-  A dataframe contaning the genomic position of
+  A dataframe contaning genomic position of
   all bins used to call peaks: chr, start, end, strand.
 }
   \item{binCounts}{
@@ -29,16 +29,16 @@ position of a single peak: chr, start, end, strand.
   for each replicate. The sample order is:
   input1, ip1, input2, ip2, ...
 }
-\item{isDMR}{A logical indicator for differential methylated region.
+\item{isDMR}{A logical value indicating whether the input region is DMR.
 Default is FALSE.
 }
 \item{Sname}{
-Sample names. If ``isDMR = TRUE``, then these sample names
-will be used for the title of each plot.
+Sample names. If isDMR = TRUE, then it
+will be used as the title of each plot.
 }
   \item{ext}{
   An integer indicating the length of base paris
-  to extend the peak on both sides: (start - ext, end + ext).
+  to extend the region on both sides: (start - ext, end + ext).
   Default is 500.
 }
   \item{ylim}{

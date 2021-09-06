@@ -1,5 +1,4 @@
-MLE.parallel <- function(mat, sf, D,
-                         iniby = "lm"){
+MLE.parallel <- function(mat, sf, D){
   ### Perform MLE estimation for NB model
   ### mat: read count matrix: input1, ip1, input2, ip2, ....
   ### sf: size factor of all samples
@@ -12,7 +11,6 @@ MLE.parallel <- function(mat, sf, D,
   Y = mat[, seq(2, ncol(mat), 2)]
   sy = sf[seq(2, ncol(mat), 2)]
   Ratio = meRatio(counts = mat, sf = sf)
- # D = model.matrix(model, variable)
   ###### estimate mu, phi by the MLE either under Beta or NB model
   # res.MLE = mclapply(1:nrow(Ratio), iMLE,
   #                    X, Y, sx, sy,
@@ -22,7 +20,7 @@ MLE.parallel <- function(mat, sf, D,
   #                    )
   res.MLE = mclapply(seq_len(nrow(Ratio)), iMLE,
                      X, Y, sx, sy,
-                     Ratio, D, iniby,
+                     Ratio, D,
                      mc.set.seed = TRUE,
                      mc.cores = 2
                      )

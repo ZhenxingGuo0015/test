@@ -14,11 +14,8 @@ meRatio <- function(counts, sf){
   lambda_x.hat = sweep(x, 2, sf.x, FUN = "/")
   lambda_y.hat = sweep(y, 2, sf.y, FUN = "/")
   ratio = (lambda_y.hat)/(lambda_x.hat + lambda_y.hat)
-  #set.seed(123)
   ratio[is.na(ratio)] = runif(sum(is.na(ratio)), 0.1, 0.2) #0.001
-  #set.seed(123)
   ratio[ratio == 0] = runif(sum(ratio == 0), 0.1, 0.2) #0.01
-  #set.seed(123)
   ratio[ratio == 1] = runif(sum(ratio == 1), 0.9, 0.95) #0.99
   return(ratio)
 }

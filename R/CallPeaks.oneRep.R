@@ -1,11 +1,13 @@
 ### peak calling for real data when there are only one replicate
-M6Apeak.oneRep <- function(Counts, sf = NULL, bins,
-                           WhichThreshold = "fdr_lfc",
-                           pval.cutoff = 1e-05,
-                           fdr.cutoff = 0.05,
-                           lfc.cutoff = 0.7,
-                           windlen = 5,
-                           lowCount = 10){
+CallPeaks.oneRep <- function(Counts,
+                             bins,
+                             sf = NULL,
+                             WhichThreshold = "fdr_lfc",
+                             pval.cutoff = 1e-05,
+                             fdr.cutoff = 0.05,
+                             lfc.cutoff = 0.7,
+                             windlen = 5,
+                             lowCount = 10){
   ### step 1: grasp bumps based on lfc or binomial test
   if(length(sf) == 0){
     sf = colSums(Counts)/median(colSums(Counts))
@@ -46,7 +48,7 @@ M6Apeak.oneRep <- function(Counts, sf = NULL, bins,
     fdr = p.adjust(pvals, method = "fdr")
     peaks = cbind(peaks, count)
     peaks$pvals = pvals
-    peaks$score = fdr
+    peaks$p.adj = fdr
 
     ### calculate log fold change for peak regions
     thiscount = peaks[, which(grepl("bam", colnames(peaks)) |
